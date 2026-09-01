@@ -12,15 +12,20 @@ let serviceAccount;
 let keySource = 'unknown';
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  let rawKey = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+  if ((rawKey.startsWith('"') && rawKey.endsWith('"')) || (rawKey.startsWith("'") && rawKey.endsWith("'"))) {
+    rawKey = rawKey.slice(1, -1).trim();
+  }
+
   try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    keySource = 'Environment Variable';
+    serviceAccount = JSON.parse(rawKey);
+    keySource = 'Environment Variable (JSON)';
   } catch (e) {
     try {
-      serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('utf-8'));
+      serviceAccount = JSON.parse(Buffer.from(rawKey, 'base64').toString('utf-8'));
       keySource = 'Environment Variable (Base64)';
     } catch (e2) {
-      throw new Error('❌ ไม่สามารถอ่านค่า FIREBASE_SERVICE_ACCOUNT ได้ กรุณาตรวจสอบรูปแบบ JSON');
+      throw new Error(`❌ ไม่สามารถอ่านค่า FIREBASE_SERVICE_ACCOUNT ได้ (${e2.message})`);
     }
   }
 } else {
