@@ -100,6 +100,46 @@ function initNotificationQueue(client) {
             } catch (roleErr) {
               console.error('❌ [Queue] ไม่สามารถซิงค์ Role/Nickname ตอนอนุมัติได้:', roleErr);
             }
+          } else if (item.type === 'UPDATE_ROLE' && (item.recipientId || item.discordId)) {
+            const targetId = item.recipientId || item.discordId;
+
+            for (const [guildId, guild] of client.guilds.cache) {
+              const guildMember = await guild.members.fetch(targetId).catch(() => null);
+              if (guildMember) {
+                // 1. ถอด/ใส่ Role ตามสายอาชีพใหม่
+                if (item.newClass) {
+                  await assignClassRole(guildMember, item.newClass);
+                } else if (item.addRoleIds || item.removeRoleIds) {
+                  if (item.removeRoleIds && item.removeRoleIds.length > 0) {
+                    for (const rId of item.removeRoleIds) {
+                      if (guildMember.roles.cache.has(rId)) {
+                        await guildMember.roles.remove(rId).catch(console.error);
+                      }
+                    }
+                  }
+                  if (item.addRoleIds && item.addRoleIds.length > 0) {
+                    for (const rId of item.addRoleIds) {
+                      if (!guildMember.roles.cache.has(rId)) {
+                        await guildMember.roles.add(rId).catch(console.error);
+                      }
+                    }
+                  }
+                }
+
+                // 2. ซิงค์ Nickname ด้วย (เช่น [LK] Nickname)
+                if (item.nickname && item.newClass) {
+                  await syncNickname(guildMember, item.nickname, item.newClass);
+                }
+              }
+            }
+
+            await docSnap.ref.update({ 
+              status: 'SENT', 
+              sentAt: new Date(),
+              completedAt: new Date()
+            });
+
+            console.log(`✅ [Queue] อัปเดต Role/Nickname ให้ ${item.nickname || targetId} เรียบร้อยแล้ว`);
           }
         } catch (error) {
           console.error(`❌ [Queue] เกิดข้อผิดพลาดในการประมวลผล (${docId}):`, error);
